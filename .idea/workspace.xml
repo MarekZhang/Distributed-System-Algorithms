@@ -2,11 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="c08e4f37-66c3-4d3c-a38b-deafb078c674" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/Distributed-System-Algorithms.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/mr/master.go" beforeDir="false" afterPath="$PROJECT_DIR$/src/mr/master.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/mr/rpc.go" beforeDir="false" afterPath="$PROJECT_DIR$/src/mr/rpc.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/mr/worker.go" beforeDir="false" afterPath="$PROJECT_DIR$/src/mr/worker.go" afterDir="false" />
@@ -71,7 +67,7 @@
       <directory value="$PROJECT_DIR$" />
       <method v="2" />
     </configuration>
-    <configuration name="go run mrworker" type="GoApplicationRunConfiguration" factoryName="Go Application" activateToolWindowBeforeRun="false">
+    <configuration name="go run mrworker" type="GoApplicationRunConfiguration" factoryName="Go Application" activateToolWindowBeforeRun="false" temporary="true">
       <module name="Distributed-System-Algorithms" />
       <working_directory value="$PROJECT_DIR$/src/main" />
       <go_parameters value="-i" />
@@ -89,6 +85,7 @@
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Go Build.go run mrworker" />
         <item itemvalue="Go Build.go build worker.go" />
         <item itemvalue="Go Build.go build master.go" />
       </list>
@@ -119,9 +116,9 @@
           <option name="timeStamp" value="3" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/src/main/mrworker.go</url>
-          <line>26</line>
-          <option name="timeStamp" value="19" />
+          <url>file://$PROJECT_DIR$/src/mr/worker.go</url>
+          <line>107</line>
+          <option name="timeStamp" value="24" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

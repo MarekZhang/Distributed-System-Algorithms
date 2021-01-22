@@ -16,11 +16,13 @@ type Master struct {
 	// Your definitions here.
 	allWorkDone bool
 	mapWorkDone bool
+	reduceWorkDone bool
 	mapWorkList map[string]int
 	mapCompleted []bool
 	reduceCompleted []bool
 	reduceWorkList map[int]bool
 	intermediateList []string
+	nreduce int
 	mu sync.Mutex
 }
 
@@ -41,10 +43,17 @@ func (m *Master) Example(args *ExampleArgs, reply *ExampleReply) error {
 // master schedule job for workers
 func (m *Master) JobSchedule(args *Args, reply *Reply) error {
 	// assessment if all work done reply.allWorkDone = true
-	reply.Funcname = "dummy"
-	reply.Mapname = "foo"
+	if Mas.reduceWorkDone {
+		Mas.allWorkDone = true
+	}
+
 	reply.allworkdone = Mas.allWorkDone
+	if Mas.allWorkDone {
+		os.Exit(0)
+	}
+
 	Mas.mu.Lock()
+	defer Mas.mu.Unlock()
 	if !Mas.mapWorkDone {
 		for key, value := range Mas.mapWorkList {
 			// assign a map task to the worker
@@ -58,14 +67,16 @@ func (m *Master) JobSchedule(args *Args, reply *Reply) error {
 		Mas.mapWorkDone = true
 	} else {
 		// assign a reduce task to the worker
-		for idx, value := range Mas.reduceWorkList {
+		for key, value := range Mas.reduceWorkList {
 			if !value {
-				reply.Reducenumber = idx
+				reply.NReduce = Mas.nreduce
+				reply.Reducenumber = key
 				reply.Funcname = "reduce"
+				return nil
 			}
 		}
+		Mas.reduceWorkDone = true
 	}
-	Mas.mu.Unlock()
 	time.Sleep(time.Second * 2)
 
 	return nil
@@ -82,8 +93,8 @@ func (m *Master) MapDone(args *Args, reply * Reply) error{
 
 func (m *Master) ReduceDone(args *Args, reply * Reply) error{
 	Mas.mu.Lock()
-	Mas.reduceCompleted[args.RedueceNo] = true
-	Mas.mu.Unlock()
+	defer Mas.mu.Unlock()
+	Mas.reduceWorkList[args.RedueceNo] = true
 
 	return nil
 }
@@ -129,6 +140,7 @@ func MakeMaster(files []string, nReduce int) *Master {
 	Mas.mapWorkDone = false
 	Mas.mapWorkList = make(map[string]int)
 	Mas.reduceWorkList = make(map[int]bool)
+	Mas.nreduce = nReduce
 	cnt := 0
 	for _, filename := range files{
 		Mas.mapWorkList[filename] = cnt

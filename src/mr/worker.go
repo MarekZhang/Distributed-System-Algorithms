@@ -1,12 +1,14 @@
 package mr
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io/ioutil"
 	"log"
 	"net/rpc"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 )
@@ -24,7 +26,7 @@ type ByKey []KeyValue
 
 // for sorting by key
 func (a ByKey) Len() int 		   { return len(a) }
-func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[i], a[j] }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 //
@@ -69,14 +71,15 @@ func Worker(mapf func(string, string) []KeyValue,
 			keyValuesArr := mapf(filename, string(content))
 
 			// store intermediate key-value
-			sort.Sort(ByKey(keyValuesArr))
 			oname := "map-inter-" + strconv.Itoa(mapnumber)
 			ofile, _ := os.Create(oname)
+			enc := json.NewEncoder(ofile)
 
-			i := 0
-			for i < len(keyValuesArr) {
-				fmt.Fprintf(ofile, "%v %v\n", keyValuesArr[i].Key, keyValuesArr[i].Value)
-				i++
+			for _, kv := range keyValuesArr {
+				err := enc.Encode(&kv)
+				if err != nil {
+					log.Fatal("unable to encode %v", kv)
+				}
 			}
 
 			ofile.Close()
@@ -87,11 +90,69 @@ func Worker(mapf func(string, string) []KeyValue,
 			fmt.Println("map completed", oname)
 
 		} else if funcname == "reduce" {
-			fmt.Println("reduce start to work")
+			// traverse all intermediate key-value file
+			reduceFiles := []string{}
+			files, _ := ioutil.ReadDir("./")
+			for _, f := range files {
+				// find all intermediate key-value files
+				match, _ := regexp.MatchString("map-inter*", f.Name())
+				if match{
+					reduceFiles = append(reduceFiles, f.Name())
+				}
+			}
+
+			nreduce := reply.NReduce
+			idx := reply.Reducenumber
+			fmt.Println("reduce start", idx)
+
+			kva := []KeyValue{}
+			for _, filename := range reduceFiles {
+				file, err := os.Open(filename)
+				if err != nil {
+					log.Fatalf("cannot open %v", filename)
+				}
+				dec := json.NewDecoder(file)
+				// gather all key values for current reduce task
+				for {
+					var kv KeyValue
+					if err := dec.Decode(&kv); err != nil{
+						break
+					}
+					if ihash(kv.Key) % nreduce == idx	{
+						kva = append(kva, kv)
+					}
+				}
+				// sort
+				sort.Sort(ByKey(kva))
+				// save result
+				oname := "mr-out-" + strconv.Itoa(idx)
+				ofile, _ := os.Create(oname)
+
+				i := 0
+				for i < len(kva) {
+					j := i + 1
+					for j < len(kva) && kva[j].Key == kva[i].Key {
+						j++
+					}
+					values := []string{}
+					for k := i; k < j; k++{
+						values = append(values, kva[k].Value)
+					}
+					output := reducef(kva[i].Key, values)
+
+					fmt.Fprintf(ofile, "%v %v\n", kva[i].Key, output)
+
+					i = j
+				}
+
+				ofile.Close()
+
+				args := Args{}
+				args.RedueceNo = idx
+				call("Master.ReduceDone", &args, &reply)
+			}
 		}
 	}
-	// uncomment to send the Example RPC to the master.
-	//CallExample()
 }
 
 // worker ask for a job(whether map or reduce depends on the return value)

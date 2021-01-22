@@ -36,6 +36,7 @@ type Reply struct {
 	Mapname string
 	Mapnumber int
 	Reducenumber int
+	NReduce int
 	allworkdone bool
 }
 
