@@ -8,9 +8,9 @@ import (
 	"log"
 	"net/rpc"
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
+	"time"
 )
 
 //
@@ -51,15 +51,20 @@ func Worker(mapf func(string, string) []KeyValue,
 		//	// return the filename and func name(Map or Reduce)
 		args := Args{}
 		reply := Reply{}
-		call("Master.JobSchedule", &args, &reply)
-		haswork = !reply.allworkdone
-		fmt.Println(reply.Funcname)
+		// return false if cannot connect with master through rpc
+		connected := call("Master.JobSchedule", &args, &reply)
+		if !connected {
+			fmt.Println("all work done, exit")
+			os.Exit(0)
+		}
+
+		haswork = !reply.Allworkdone
 		funcname := reply.Funcname
 
 		if funcname == "map" {
-			filename := reply.Mapname
-			mapnumber := reply.Mapnumber
-			file, err := os.Open(filename)
+			filename := reply.Task.File_list
+			mapnumber := reply.Task.Map_no
+			file, err := os.Open(filename[0])
 			if err != nil {
 				log.Fatalf("cannot open %v", filename)
 			}
@@ -68,41 +73,57 @@ func Worker(mapf func(string, string) []KeyValue,
 				log.Fatalf("cannot read %v", filename)
 			}
 			fmt.Println("worker is working on mapping", filename) //filename == original file
-			keyValuesArr := mapf(filename, string(content))
+			keyValuesArr := mapf(filename[0], string(content))
 
-			// store intermediate key-value
-			oname := "map-inter-" + strconv.Itoa(mapnumber)
-			ofile, _ := os.Create(oname)
-			enc := json.NewEncoder(ofile)
+			// store intermediate key-value into N(number of reduce) files
+			nreduce := reply.Nreduce
+			ofiles := []*os.File{}
+			reduceTasks := make([]string, nreduce)
+			// create n reduce tasks
 
-			for _, kv := range keyValuesArr {
-				err := enc.Encode(&kv)
-				if err != nil {
-					log.Fatal("unable to encode %v", kv)
-				}
+			for i := 0; i < nreduce; i++ {
+				oname := "mr-" + strconv.Itoa(mapnumber) + "-" + strconv.Itoa(i)
+				ofile, _ := os.Create(oname)
+				ofiles = append(ofiles, ofile)
+				defer ofile.Close()
+				//add intermediate key-value files for assigning to reduce workder
+				reduceTasks[i] = oname
 			}
 
-			ofile.Close()
+			// partition intermediate key-value into n(reduce no)
+			encoders := make([]*json.Encoder, len(ofiles))
+			for idx, ofile := range ofiles {
+				encoders[idx] = json.NewEncoder(ofile)
+			}
+
+			// encoded intermediate key-value in json format
+			for _, kv := range keyValuesArr {
+				// partition current map output into N(number of reduce tasks) files
+				idx := ihash(kv.Key) % nreduce
+				err := encoders[idx].Encode(&kv)
+				if err != nil {
+					log.Fatal("Unable to encode % v", kv)
+				}
+			}
 
 			args := Args{}
-			args.Mapname = filename
-			call("Master.MapDone", &args, &reply)
-			fmt.Println("map completed", oname)
+			args.Mapwork_no = reply.Task.Map_no
+			args.ReduceTasks = reduceTasks
+			call("Master.MapDone", &args, &reply) // add reduce task
+			fmt.Println(reply.Task.Map_no ,"map completed")
 
 		} else if funcname == "reduce" {
-			// traverse all intermediate key-value file
-			reduceFiles := []string{}
-			files, _ := ioutil.ReadDir("./")
-			for _, f := range files {
-				// find all intermediate key-value files
-				match, _ := regexp.MatchString("map-inter*", f.Name())
-				if match{
-					reduceFiles = append(reduceFiles, f.Name())
-				}
+			// if map task has not been completed periodically block the reduce worker
+			mapDone := false
+			for !mapDone {
+				time.Sleep(time.Second)
+				call("Master.MapIsDone", &mapDone, &mapDone)
 			}
 
-			nreduce := reply.NReduce
-			idx := reply.Reducenumber
+			// traverse all intermediate key-value file
+			reduceFiles := reply.Task.File_list
+			nreduce := reply.Nreduce
+			idx := reply.Task.Reduce_no
 			fmt.Println("reduce start", idx)
 
 			kva := []KeyValue{}
@@ -148,7 +169,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				ofile.Close()
 
 				args := Args{}
-				args.RedueceNo = idx
+				args.Reducework_no = idx
 				call("Master.ReduceDone", &args, &reply)
 			}
 		}
@@ -156,8 +177,8 @@ func Worker(mapf func(string, string) []KeyValue,
 }
 
 // worker ask for a job(whether map or reduce depends on the return value)
-func CallForJob(args *Args, reply *Reply) {
-	call("Master.JobSchedule", args, reply)
+func CallForJob(args *Args, reply *Reply) bool{
+	return call("Master.JobSchedule", args, reply)
 }
 
 //

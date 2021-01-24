@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
+	"time"
 )
 
 func main() {
@@ -17,6 +19,10 @@ func main() {
 
 	arr := make([]int, 10)
 	arr[0] = 1
-	fmt.Println(cap(arr))
+
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 20; i++ {
+		fmt.Println(rand.Intn(100))
+	}
 
 }

@@ -27,18 +27,18 @@ type ExampleReply struct {
 
 // Add your RPC definitions here.
 type Args struct {
-	Mapname string
-	RedueceNo int
+	Mapwork_no		int
+	Reducework_no  	int
+	ReduceTasks 	[]string
 }
 
 type Reply struct {
-	Funcname string
-	Mapname string
-	Mapnumber int
-	Reducenumber int
-	NReduce int
-	allworkdone bool
+	Funcname 	 string
+	Allworkdone  bool
+	Task 		 *Task
+	Nreduce 	 int
 }
+
 
 
 
